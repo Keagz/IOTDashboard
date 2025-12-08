@@ -1,0 +1,737 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IoT Device Monitor</title>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-dark: #0a0e27;
+            --bg-card: #151b3d;
+            --accent-cyan: #00d9ff;
+            --accent-green: #00ff88;
+            --accent-orange: #ff6b35;
+            --accent-red: #ff2e63;
+            --accent-purple: #9d4edd;
+            --accent-gray: #64748b;
+            --text-primary: #ffffff;
+            --text-secondary: #94a3b8;
+            --glow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 20px;
+            background-image: 
+                radial-gradient(circle at 20% 50%, rgba(157, 78, 221, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(0, 217, 255, 0.1) 0%, transparent 50%);
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 50px;
+            animation: slideDown 0.8s ease-out;
+        }
+
+        .header h1 {
+            font-family: 'Space Mono', monospace;
+            font-size: 3.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 10px;
+            letter-spacing: -2px;
+        }
+
+        .subtitle {
+            font-size: 1.1em;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+
+        .status-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 25px;
+            background: var(--bg-card);
+            border-radius: 12px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(0, 217, 255, 0.1);
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .pulse-dot {
+            width: 10px;
+            height: 10px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+
+        .last-update {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85em;
+            color: var(--text-secondary);
+        }
+
+        /* Gauges Section */
+        .gauges-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 25px;
+            margin-bottom: 50px;
+        }
+
+        .gauge-card {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 30px 20px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .gauge-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--card-color), transparent);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .gauge-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--card-color);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 20px var(--card-color);
+        }
+
+        .gauge-card:hover::before {
+            opacity: 1;
+        }
+
+        .gauge-card.installed { --card-color: var(--accent-green); }
+        .gauge-card.transmitting { --card-color: var(--accent-cyan); }
+        .gauge-card.not-transmitting { --card-color: var(--accent-orange); }
+        .gauge-card.zeros { --card-color: var(--accent-red); }
+        .gauge-card.not-installed { --card-color: var(--accent-gray); }
+        .gauge-card.not-updated { --card-color: var(--accent-purple); }
+
+        .gauge-visual {
+            width: 140px;
+            height: 140px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+
+        .gauge-svg {
+            transform: rotate(-90deg);
+            filter: drop-shadow(0 0 8px var(--card-color));
+        }
+
+        .gauge-bg {
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 12;
+        }
+
+        .gauge-fill {
+            fill: none;
+            stroke: var(--card-color);
+            stroke-width: 12;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .gauge-value {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 2.5em;
+            font-weight: 700;
+            font-family: 'Space Mono', monospace;
+            color: var(--card-color);
+        }
+
+        .gauge-label {
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .gauge-percentage {
+            font-size: 1.1em;
+            color: var(--card-color);
+            font-weight: 600;
+            margin-top: 10px;
+        }
+
+        /* Device Table Section */
+        .table-section {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            animation: fadeIn 1s ease-out 0.3s both;
+        }
+
+        .table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .table-header h2 {
+            font-size: 1.8em;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .device-count {
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            background: rgba(0, 217, 255, 0.1);
+            border-radius: 20px;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .table-wrapper {
+            overflow-x: auto;
+            max-height: 600px;
+            border-radius: 10px;
+        }
+
+        .device-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9em;
+        }
+
+        .device-table thead {
+            position: sticky;
+            top: 0;
+            background: var(--bg-dark);
+            z-index: 10;
+        }
+
+        .device-table th {
+            padding: 15px 12px;
+            text-align: left;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-size: 0.75em;
+            color: var(--text-secondary);
+            border-bottom: 2px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .device-table td {
+            padding: 18px 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85em;
+        }
+
+        .device-table tbody tr {
+            transition: all 0.2s ease;
+        }
+
+        .device-table tbody tr:hover {
+            background: rgba(0, 217, 255, 0.05);
+            transform: scale(1.01);
+        }
+
+        .sig-cell {
+            font-weight: 700;
+            color: var(--accent-cyan);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.transmitting {
+            background: rgba(0, 255, 136, 0.15);
+            color: var(--accent-green);
+            border: 1px solid var(--accent-green);
+        }
+
+        .status-badge.false {
+            background: rgba(255, 46, 99, 0.15);
+            color: var(--accent-red);
+            border: 1px solid var(--accent-red);
+        }
+
+        .fw-status {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+
+        .fw-status.ok {
+            color: var(--accent-green);
+        }
+
+        .fw-status.update {
+            background: rgba(255, 107, 53, 0.15);
+            color: var(--accent-orange);
+            border: 1px solid var(--accent-orange);
+        }
+
+        .installed-status {
+            color: var(--accent-cyan);
+            font-weight: 600;
+        }
+
+        .installed-status.removed {
+            color: var(--accent-gray);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 60px;
+            font-size: 1.2em;
+            color: var(--text-secondary);
+        }
+
+        .error {
+            background: rgba(255, 46, 99, 0.1);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .config-panel {
+            background: var(--bg-card);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(0, 217, 255, 0.2);
+        }
+
+        .config-panel h3 {
+            color: var(--accent-cyan);
+            margin-bottom: 20px;
+            font-size: 1.4em;
+        }
+
+        .config-panel input {
+            width: 100%;
+            padding: 15px;
+            background: var(--bg-dark);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1em;
+            font-family: 'Space Mono', monospace;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .config-panel input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.2);
+        }
+
+        .config-panel button {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: white;
+            border: none;
+            padding: 15px 35px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .config-panel button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.3);
+        }
+
+        .timestamp-cell {
+            color: var(--text-secondary);
+            font-size: 0.8em;
+        }
+
+        /* Animations */
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .gauges-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .table-wrapper {
+                font-size: 0.85em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⚡ IoT MONITOR</h1>
+            <div class="subtitle">Real-time Device Telemetry Dashboard</div>
+        </div>
+
+        <div class="config-panel" id="configPanel" style="display: none;">
+            <h3>📋 Configuration</h3>
+            <input type="text" id="sheetUrl" placeholder="Enter Google Sheet URL" 
+                   value="https://docs.google.com/spreadsheets/d/1nC-nLfFwI0zia3ItR5ljpPimfTdXGUSVPXUMEkbjEV4/edit?usp=sharing">
+            <button onclick="saveConfig()">Connect Dashboard</button>
+            <p style="margin-top: 15px; font-size: 0.85em; color: var(--text-secondary);">
+                Ensure your Google Sheet is publicly accessible
+            </p>
+        </div>
+
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="pulse-dot"></div>
+                <span>Live Connection</span>
+            </div>
+            <div class="last-update" id="lastUpdate">Initializing...</div>
+        </div>
+
+        <div id="loading" class="loading">🔄 Loading telemetry data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="dashboardContent" style="display: none;">
+            <!-- Gauges Grid -->
+            <div class="gauges-grid" id="gaugesGrid"></div>
+
+            <!-- Device Table -->
+            <div class="table-section">
+                <div class="table-header">
+                    <h2>📡 Device Status</h2>
+                    <div class="device-count" id="deviceCount">0 Devices</div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="device-table">
+                        <thead>
+                            <tr>
+                                <th>Timestamp</th>
+                                <th>SIG</th>
+                                <th>Software</th>
+                                <th>Voltage</th>
+                                <th>Current</th>
+                                <th>Temp</th>
+                                <th>SOC %</th>
+                                <th>Cycles</th>
+                                <th>CSQ</th>
+                                <th>Transmitting</th>
+                                <th>FW Status</th>
+                                <th>Installed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="deviceTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
+        const SHEET_ID = '1nC-nLfFwI0zia3ItR5ljpPimfTdXGUSVPXUMEkbjEV4';
+        let refreshTimer;
+
+        // Create circular gauge
+        function createGauge(value, max, color) {
+            const percentage = (value / max) * 100;
+            const circumference = 2 * Math.PI * 60;
+            const offset = circumference - (percentage / 100) * circumference;
+            
+            return `
+                <svg class="gauge-svg" width="140" height="140" viewBox="0 0 140 140">
+                    <circle class="gauge-bg" cx="70" cy="70" r="60"/>
+                    <circle class="gauge-fill" cx="70" cy="70" r="60"
+                            style="stroke-dasharray: ${circumference}; stroke-dashoffset: ${offset};"/>
+                </svg>
+                <div class="gauge-value">${value}</div>
+            `;
+        }
+
+        // Fetch data from Google Sheets using JSON API
+        async function loadData() {
+            try {
+                document.getElementById('loading').style.display = 'block';
+                document.getElementById('error').style.display = 'none';
+
+                // Fetch JSON data
+                const apiUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+                
+                console.log('Fetching from:', apiUrl);
+                
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: Cannot access sheet`);
+                }
+                
+                const text = await response.text();
+                console.log('Received data, length:', text.length);
+                
+                // Parse Google's JSON format (wrapped in a function call)
+                const json = JSON.parse(text.substring(47).slice(0, -2));
+                console.log('Parsed JSON, rows:', json.table.rows.length);
+                
+                const rows = json.table.rows;
+                
+                if (rows.length === 0) {
+                    throw new Error('No data found in sheet');
+                }
+
+                // Find summary data and device rows
+                let summaryData = null;
+                let deviceRows = [];
+
+                console.log('Processing rows...');
+                
+                // Get summary data from the FIRST row
+                // O1=14, Q1=16, S1=18, U1=20, W1=22, Y1=24 (0-indexed)
+                const firstRow = rows[0].c;
+                summaryData = {
+                    totalInstalled: firstRow[14]?.v || 0,        // Column O
+                    transmittingSuccessfully: firstRow[16]?.v || 0,  // Column Q
+                    notTransmitting: firstRow[18]?.v || 0,       // Column S
+                    transmittingZeros: firstRow[20]?.v || 0,     // Column U
+                    notInstalled: firstRow[22]?.v || 0,          // Column W
+                    notUpdated: firstRow[24]?.v || 0             // Column Y
+                };
+                console.log('Summary data from row 1:', summaryData);
+                
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i].c;
+                    
+                    // Collect device rows (rows with SIG data containing REET or TEST)
+                    if (row[1] && row[1].v && typeof row[1].v === 'string' && 
+                        (row[1].v.includes('REET') || row[1].v.includes('TEST'))) {
+                        deviceRows.push({
+                            timestamp: row[0]?.f || row[0]?.v || '',
+                            sig: row[1]?.v || '',
+                            software: row[2]?.v || '',
+                            voltage: row[3]?.v || 0,
+                            current: row[4]?.v || 0,
+                            temperature: row[5]?.v || 0,
+                            soc: row[6]?.v || 0,
+                            cycles: row[7]?.v || 0,
+                            csq: row[8]?.v || 0,
+                            transmitting: row[9]?.v === true || row[9]?.v === 'TRUE',
+                            fwStatus: row[10]?.v || '',
+                            installed: row[11]?.v || ''
+                        });
+                    }
+                }
+
+                console.log('Found devices:', deviceRows.length);
+
+                displayGauges(summaryData);
+                displayDeviceTable(deviceRows.slice(-50)); // Show last 50 devices
+                
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('dashboardContent').style.display = 'block';
+                document.getElementById('lastUpdate').textContent = 
+                    `Last Updated: ${new Date().toLocaleTimeString()}`;
+                document.getElementById('deviceCount').textContent = 
+                    `${deviceRows.length} Devices`;
+
+            } catch (error) {
+                console.error('Full error:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').innerHTML = 
+                    `❌ <strong>Error:</strong> ${error.message}<br><br>
+                    <small>Check browser console (F12) for detailed logs</small>`;
+            }
+        }
+
+        // Display gauge cards
+        function displayGauges(data) {
+            const total = data.totalInstalled + data.notInstalled;
+            
+            const gauges = [
+                {
+                    label: 'Total Installed',
+                    value: data.totalInstalled,
+                    max: total,
+                    percentage: `${((data.totalInstalled / total) * 100).toFixed(1)}%`,
+                    class: 'installed'
+                },
+                {
+                    label: 'Transmitting OK',
+                    value: data.transmittingSuccessfully,
+                    max: data.totalInstalled,
+                    percentage: `${((data.transmittingSuccessfully / data.totalInstalled) * 100).toFixed(1)}%`,
+                    class: 'transmitting'
+                },
+                {
+                    label: 'Not Transmitting',
+                    value: data.notTransmitting,
+                    max: data.totalInstalled,
+                    percentage: `${((data.notTransmitting / data.totalInstalled) * 100).toFixed(1)}%`,
+                    class: 'not-transmitting'
+                },
+                {
+                    label: 'Transmitting Zero\'s',
+                    value: data.transmittingZeros,
+                    max: data.totalInstalled,
+                    percentage: `${((data.transmittingZeros / data.totalInstalled) * 100).toFixed(1)}%`,
+                    class: 'zeros'
+                },
+                {
+                    label: 'Not Installed',
+                    value: data.notInstalled,
+                    max: total,
+                    percentage: `${((data.notInstalled / total) * 100).toFixed(1)}%`,
+                    class: 'not-installed'
+                },
+                {
+                    label: 'Not Updated',
+                    value: data.notUpdated,
+                    max: data.totalInstalled,
+                    percentage: `${((data.notUpdated / data.totalInstalled) * 100).toFixed(1)}%`,
+                    class: 'not-updated'
+                }
+            ];
+
+            const grid = document.getElementById('gaugesGrid');
+            grid.innerHTML = gauges.map(gauge => `
+                <div class="gauge-card ${gauge.class}">
+                    <div class="gauge-label">${gauge.label}</div>
+                    <div class="gauge-visual">
+                        ${createGauge(gauge.value, gauge.max)}
+                    </div>
+                    <div class="gauge-percentage">${gauge.percentage}</div>
+                </div>
+            `).join('');
+        }
+
+        // Display device table
+        function displayDeviceTable(devices) {
+            const tbody = document.getElementById('deviceTableBody');
+            tbody.innerHTML = devices.map(device => `
+                <tr>
+                    <td class="timestamp-cell">${device.timestamp}</td>
+                    <td class="sig-cell">${device.sig}</td>
+                    <td>${device.software}</td>
+                    <td>${device.voltage !== 0 ? device.voltage.toFixed(1) + 'V' : '-'}</td>
+                    <td>${device.current !== 0 ? device.current.toFixed(1) + 'A' : '-'}</td>
+                    <td>${device.temperature !== 0 ? device.temperature + '°C' : '-'}</td>
+                    <td>${device.soc !== 0 ? device.soc + '%' : '-'}</td>
+                    <td>${device.cycles || '-'}</td>
+                    <td>${device.csq || '-'}</td>
+                    <td>
+                        <span class="status-badge ${device.transmitting === true ? 'transmitting' : 'false'}">
+                            ${device.transmitting === true ? '✓ YES' : '✗ NO'}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="fw-status ${device.fwStatus === 'OK' ? 'ok' : 'update'}">
+                            ${device.fwStatus || '-'}
+                        </span>
+                    </td>
+                    <td class="installed-status ${device.installed !== 'Installed' ? 'removed' : ''}">
+                        ${device.installed || '-'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Auto-refresh
+        function startAutoRefresh() {
+            if (refreshTimer) clearInterval(refreshTimer);
+            refreshTimer = setInterval(loadData, REFRESH_INTERVAL);
+        }
+
+        // Initialize
+        window.addEventListener('load', () => {
+            loadData();
+            startAutoRefresh();
+        });
+    </script>
+</body>
+</html>
