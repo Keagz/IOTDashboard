@@ -288,6 +288,7 @@
 
         .device-table tbody tr {
             transition: all 0.2s ease;
+            cursor: pointer;
         }
 
         .device-table tbody tr:hover {
@@ -459,6 +460,194 @@
                 font-size: 0.85em;
             }
         }
+
+        /* Modal Popup */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .modal.show {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-card);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 1400px;
+            width: 95%;
+            max-height: 95vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 217, 255, 0.3);
+            animation: slideUp 0.4s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid rgba(0, 217, 255, 0.3);
+        }
+
+        .modal-header h2 {
+            font-size: 2em;
+            color: var(--accent-cyan);
+            font-family: 'Space Mono', monospace;
+        }
+
+        .close-btn {
+            background: none;
+            border: 2px solid var(--accent-red);
+            color: var(--accent-red);
+            font-size: 1.5em;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .close-btn:hover {
+            background: var(--accent-red);
+            color: white;
+            transform: rotate(90deg);
+        }
+
+        .history-chart {
+            background: var(--bg-dark);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            height: 250px;
+        }
+
+        .history-chart canvas {
+            max-height: 200px;
+        }
+
+        .time-range-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 30px;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .time-range-btn {
+            padding: 10px 20px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.9em;
+            transition: all 0.3s;
+        }
+
+        .time-range-btn:hover {
+            background: rgba(0, 217, 255, 0.1);
+            border-color: var(--accent-cyan);
+        }
+
+        .time-range-btn.active {
+            background: var(--accent-cyan);
+            border-color: var(--accent-cyan);
+            color: var(--bg-dark);
+            font-weight: 700;
+        }
+
+        .custom-range-container {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            padding: 10px 15px;
+            background: rgba(0, 217, 255, 0.05);
+            border: 2px solid rgba(0, 217, 255, 0.2);
+            border-radius: 8px;
+            flex-wrap: wrap;
+        }
+
+        .custom-range-container label {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        .custom-range-container input[type="datetime-local"] {
+            padding: 8px 12px;
+            background: var(--bg-dark);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85em;
+        }
+
+        .custom-range-container button {
+            padding: 8px 16px;
+            background: var(--accent-cyan);
+            border: none;
+            border-radius: 6px;
+            color: var(--bg-dark);
+            font-weight: 700;
+            cursor: pointer;
+            font-family: 'Space Mono', monospace;
+            font-size: 0.85em;
+            transition: all 0.3s;
+        }
+
+        .custom-range-container button:hover {
+            background: var(--accent-green);
+            transform: translateY(-2px);
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 60px;
+            font-size: 1.2em;
+            color: var(--accent-cyan);
+        }
+
+        .loading-spinner::after {
+            content: '⚡';
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -526,6 +715,20 @@
         </div>
     </div>
 
+    <!-- Historical Data Modal -->
+    <div id="historyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalDeviceName">Device History</h2>
+                <button class="close-btn" onclick="closeModal()">×</button>
+            </div>
+            <div id="modalBody">
+                <div class="loading-spinner">Loading historical data</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
         const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
         const SHEET_ID = '1nC-nLfFwI0zia3ItR5ljpPimfTdXGUSVPXUMEkbjEV4';
@@ -555,9 +758,11 @@
                 document.getElementById('error').style.display = 'none';
 
                 // Fetch JSON data from the Summary sheet
-                const apiUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=941941150`;
+                const SUMMARY_SHEET_GID = '941941150';
+                const apiUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=${SUMMARY_SHEET_GID}`;
                 
-                console.log('Fetching from Summary sheet:', apiUrl);
+                console.log('🔍 Fetching from SUMMARY SHEET (gid=' + SUMMARY_SHEET_GID + ')');
+                console.log('📍 Full URL:', apiUrl);
                 
                 const response = await fetch(apiUrl);
                 
@@ -571,6 +776,7 @@
                 // Parse Google's JSON format (wrapped in a function call)
                 const json = JSON.parse(text.substring(47).slice(0, -2));
                 console.log('Parsed JSON, rows:', json.table.rows.length);
+                console.log('⚠️ IMPORTANT: First row timestamp should be recent (Dec 2025), not old (Nov 2025)');
                 
                 const rows = json.table.rows;
                 
@@ -776,7 +982,7 @@
                 };
                 
                 return `
-                <tr>
+                <tr onclick="showDeviceHistory('${device.sig}')">
                     <td class="timestamp-cell">${device.timestamp || '-'}</td>
                     <td class="sig-cell">${device.sig || '-'}</td>
                     <td>${device.software || '-'}</td>
@@ -817,6 +1023,8 @@
         });
         
         let activeFilter = null;
+        let currentDevice = null; // Track current device in modal
+        let activeTimeRange = '1d'; // Default to 1 day
         
         // Clear all filters and reload
         function clearAllFilters() {
@@ -916,6 +1124,420 @@
             } else {
                 document.getElementById('deviceCount').textContent = 
                     `${allDevices.length} Devices`;
+            }
+        }
+        
+        // =====================================================
+        // INFLUXDB INTEGRATION
+        // =====================================================
+        
+        // InfluxDB Configuration
+        const INFLUXDB_CONFIG = {
+            url: 'https://us-east-1-1.aws.cloud2.influxdata.com',
+            token: 'gX1VVAVav-qDY7kY-61jlCz5vJRKDFqTUM85KW9Ud1pGh7h90jTwTXScp8DTctdAWRIzF5UeQ47CXLVsGU4ABw==',
+            org: '197676ca308df45e',
+            bucket: 'iot_data',
+            measurement: 'battery_data'
+        };
+        
+        // Fetch historical data from InfluxDB
+        async function fetchInfluxData(deviceSig, timeRange = '1d', customFrom = null, customTo = null) {
+            let query;
+            
+            if (timeRange === 'custom' && customFrom && customTo) {
+                // Custom date range
+                const fromTime = new Date(customFrom).toISOString();
+                const toTime = new Date(customTo).toISOString();
+                
+                // Calculate appropriate aggregation window based on time span
+                const spanMs = new Date(customTo) - new Date(customFrom);
+                const spanHours = spanMs / (1000 * 60 * 60);
+                
+                let aggregateWindow;
+                if (spanHours <= 3) {
+                    aggregateWindow = '1m';
+                } else if (spanHours <= 24) {
+                    aggregateWindow = '5m';
+                } else if (spanHours <= 168) {
+                    aggregateWindow = '15m';
+                } else {
+                    aggregateWindow = '1h';
+                }
+                
+                query = `
+                    from(bucket: "${INFLUXDB_CONFIG.bucket}")
+                    |> range(start: ${fromTime}, stop: ${toTime})
+                    |> filter(fn: (r) => r["_measurement"] == "${INFLUXDB_CONFIG.measurement}")
+                    |> filter(fn: (r) => r["sig"] == "${deviceSig}")
+                    |> filter(fn: (r) => r["_field"] == "voltage" or r["_field"] == "current" or r["_field"] == "soc" or r["_field"] == "temperature")
+                    |> aggregateWindow(every: ${aggregateWindow}, fn: mean, createEmpty: false)
+                    |> yield(name: "mean")
+                `;
+            } else {
+                // Preset time ranges
+                const timeConfig = {
+                    '1h': { hours: 1, window: '1m' },   // 1 hour: 1-minute intervals
+                    '6h': { hours: 6, window: '5m' },   // 6 hours: 5-minute intervals
+                    '1d': { hours: 24, window: '15m' }, // 1 day: 15-minute intervals
+                    '1w': { hours: 168, window: '1h' }  // 1 week: 1-hour intervals
+                };
+                
+                const config = timeConfig[timeRange] || timeConfig['1d'];
+                
+                query = `
+                    from(bucket: "${INFLUXDB_CONFIG.bucket}")
+                    |> range(start: -${config.hours}h)
+                    |> filter(fn: (r) => r["_measurement"] == "${INFLUXDB_CONFIG.measurement}")
+                    |> filter(fn: (r) => r["sig"] == "${deviceSig}")
+                    |> filter(fn: (r) => r["_field"] == "voltage" or r["_field"] == "current" or r["_field"] == "soc" or r["_field"] == "temperature")
+                    |> aggregateWindow(every: ${config.window}, fn: mean, createEmpty: false)
+                    |> yield(name: "mean")
+                `;
+            }
+            
+            const url = `${INFLUXDB_CONFIG.url}/api/v2/query?org=${INFLUXDB_CONFIG.org}`;
+            
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Token ${INFLUXDB_CONFIG.token}`,
+                        'Content-Type': 'application/vnd.flux',
+                        'Accept': 'application/csv'
+                    },
+                    body: query
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`InfluxDB query failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const csvData = await response.text();
+                return parseInfluxCSV(csvData);
+                
+            } catch (error) {
+                console.error('InfluxDB fetch error:', error);
+                throw error;
+            }
+        }
+        
+        // Parse InfluxDB CSV response
+        function parseInfluxCSV(csv) {
+            const lines = csv.trim().split('\n');
+            const data = {
+                voltage: [],
+                current: [],
+                soc: [],
+                temperature: [],
+                timestamps: []
+            };
+            
+            // Skip header rows (InfluxDB returns annotations first)
+            let dataStartIndex = 0;
+            for (let i = 0; i < lines.length; i++) {
+                if (!lines[i].startsWith('#') && !lines[i].startsWith(',result,')) {
+                    dataStartIndex = i;
+                    break;
+                }
+            }
+            
+            // Parse data rows
+            for (let i = dataStartIndex; i < lines.length; i++) {
+                const line = lines[i];
+                if (!line || line.startsWith('#')) continue;
+                
+                const cols = line.split(',');
+                if (cols.length < 7) continue;
+                
+                const timestamp = cols[5]; // _time column
+                const field = cols[7];     // _field column
+                const value = parseFloat(cols[6]); // _value column
+                
+                if (!timestamp || isNaN(value)) continue;
+                
+                const date = new Date(timestamp);
+                
+                if (field === 'voltage') {
+                    data.voltage.push({ time: date, value: value });
+                } else if (field === 'current') {
+                    data.current.push({ time: date, value: value });
+                } else if (field === 'soc') {
+                    data.soc.push({ time: date, value: value });
+                } else if (field === 'temperature') {
+                    data.temperature.push({ time: date, value: value });
+                }
+            }
+            
+            // Extract unique timestamps
+            const allTimes = new Set();
+            [...data.voltage, ...data.current, ...data.soc, ...data.temperature].forEach(d => {
+                allTimes.add(d.time.getTime());
+            });
+            data.timestamps = Array.from(allTimes).sort().map(t => new Date(t));
+            
+            return data;
+        }
+        
+        // Show device history modal
+        async function showDeviceHistory(deviceSig) {
+            currentDevice = deviceSig;
+            const modal = document.getElementById('historyModal');
+            const modalBody = document.getElementById('modalBody');
+            const modalTitle = document.getElementById('modalDeviceName');
+            
+            // Show modal with loading state
+            modal.classList.add('show');
+            modalTitle.textContent = `📊 ${deviceSig} - Historical Data`;
+            modalBody.innerHTML = '<div class="loading-spinner">Loading historical data from InfluxDB</div>';
+            
+            try {
+                // Fetch data from InfluxDB with current time range
+                const historicalData = await fetchInfluxData(deviceSig, activeTimeRange);
+                
+                // Display the data
+                displayHistoricalData(historicalData, deviceSig, modalBody);
+                
+            } catch (error) {
+                console.error('Error fetching historical data:', error);
+                modalBody.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--accent-red);">
+                        <h3>❌ Error Loading Data</h3>
+                        <p>${error.message}</p>
+                        <p style="margin-top: 20px; color: var(--text-secondary); font-size: 0.9em;">
+                            Check browser console for details
+                        </p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Display historical data with charts
+        function displayHistoricalData(data, deviceSig, container) {
+            if (!data.timestamps || data.timestamps.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                        <h3>📭 No Historical Data</h3>
+                        <p>No data found for ${deviceSig} in the selected time range</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            const timeRangeLabels = {
+                '1h': 'Last Hour',
+                '6h': 'Last 6 Hours',
+                '1d': 'Last 24 Hours',
+                '1w': 'Last 7 Days',
+                'custom': 'Custom Range'
+            };
+            
+            // Get default values for custom range (last 24 hours to now)
+            const now = new Date();
+            const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const formatDateTime = (date) => {
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                return `${year}-${month}-${day}T${hours}:${minutes}`;
+            };
+            
+            container.innerHTML = `
+                <div class="time-range-selector">
+                    <button class="time-range-btn ${activeTimeRange === '1h' ? 'active' : ''}" onclick="changeTimeRange('1h')">
+                        ⏱️ 1 Hour
+                    </button>
+                    <button class="time-range-btn ${activeTimeRange === '6h' ? 'active' : ''}" onclick="changeTimeRange('6h')">
+                        ⏰ 6 Hours
+                    </button>
+                    <button class="time-range-btn ${activeTimeRange === '1d' ? 'active' : ''}" onclick="changeTimeRange('1d')">
+                        📅 1 Day
+                    </button>
+                    <button class="time-range-btn ${activeTimeRange === '1w' ? 'active' : ''}" onclick="changeTimeRange('1w')">
+                        📆 1 Week
+                    </button>
+                </div>
+                
+                <div class="custom-range-container">
+                    <label>📆 Custom Range:</label>
+                    <label style="font-size: 0.75em;">From:</label>
+                    <input type="datetime-local" id="customFromDate" value="${formatDateTime(yesterday)}">
+                    <label style="font-size: 0.75em;">To:</label>
+                    <input type="datetime-local" id="customToDate" value="${formatDateTime(now)}">
+                    <button onclick="applyCustomRange()">Apply</button>
+                </div>
+                
+                <div style="margin-bottom: 25px; padding: 15px; background: rgba(0, 217, 255, 0.05); border-radius: 10px; border: 1px solid rgba(0, 217, 255, 0.2);">
+                    <div style="color: var(--text-secondary); font-size: 0.9em;">
+                        <strong style="color: var(--accent-cyan);">Time Range:</strong> ${timeRangeLabels[activeTimeRange]}<br>
+                        <strong style="color: var(--accent-cyan);">From:</strong> ${data.timestamps[0].toLocaleString()}<br>
+                        <strong style="color: var(--accent-cyan);">To:</strong> ${data.timestamps[data.timestamps.length - 1].toLocaleString()}<br>
+                        <strong style="color: var(--accent-cyan);">Data Points:</strong> ${data.timestamps.length} readings
+                    </div>
+                </div>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 20px;">
+                    <div class="history-chart">
+                        <h3 style="color: var(--accent-green); margin-bottom: 10px; font-size: 1.1em;">⚡ Voltage</h3>
+                        <canvas id="voltageChart"></canvas>
+                    </div>
+                    
+                    <div class="history-chart">
+                        <h3 style="color: var(--accent-purple); margin-bottom: 10px; font-size: 1.1em;">⚡ Current</h3>
+                        <canvas id="currentChart"></canvas>
+                    </div>
+                    
+                    <div class="history-chart">
+                        <h3 style="color: var(--accent-cyan); margin-bottom: 10px; font-size: 1.1em;">🔋 State of Charge</h3>
+                        <canvas id="socChart"></canvas>
+                    </div>
+                    
+                    <div class="history-chart">
+                        <h3 style="color: var(--accent-orange); margin-bottom: 10px; font-size: 1.1em;">🌡️ Temperature</h3>
+                        <canvas id="tempChart"></canvas>
+                    </div>
+                </div>
+            `;
+            
+            // Create charts
+            createChart('voltageChart', 'Voltage (V)', data.voltage, 'rgba(0, 255, 136, 1)', 'rgba(0, 255, 136, 0.1)');
+            createChart('currentChart', 'Current (A)', data.current, 'rgba(157, 78, 221, 1)', 'rgba(157, 78, 221, 0.1)');
+            createChart('socChart', 'State of Charge (%)', data.soc, 'rgba(0, 217, 255, 1)', 'rgba(0, 217, 255, 0.1)');
+            createChart('tempChart', 'Temperature (°C)', data.temperature, 'rgba(255, 107, 53, 1)', 'rgba(255, 107, 53, 0.1)');
+        }
+        
+        // Create Chart.js chart
+        function createChart(canvasId, label, data, borderColor, backgroundColor) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+            
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: data.map(d => d.time.toLocaleString()),
+                    datasets: [{
+                        label: label,
+                        data: data.map(d => d.value),
+                        borderColor: borderColor,
+                        backgroundColor: backgroundColor,
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    aspectRatio: 2.5,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: borderColor,
+                            bodyColor: '#fff',
+                            borderColor: borderColor,
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                color: '#94a3b8',
+                                maxRotation: 45,
+                                minRotation: 45,
+                                maxTicksLimit: 8
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        },
+                        y: {
+                            ticks: {
+                                color: '#94a3b8'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Change time range and reload data
+        async function changeTimeRange(timeRange) {
+            if (!currentDevice) return;
+            
+            activeTimeRange = timeRange;
+            await showDeviceHistory(currentDevice);
+        }
+        
+        // Apply custom date range
+        async function applyCustomRange() {
+            if (!currentDevice) return;
+            
+            const fromInput = document.getElementById('customFromDate');
+            const toInput = document.getElementById('customToDate');
+            
+            if (!fromInput || !toInput) return;
+            
+            const fromDate = fromInput.value;
+            const toDate = toInput.value;
+            
+            if (!fromDate || !toDate) {
+                alert('Please select both From and To dates');
+                return;
+            }
+            
+            const fromTime = new Date(fromDate);
+            const toTime = new Date(toDate);
+            
+            if (fromTime >= toTime) {
+                alert('From date must be before To date');
+                return;
+            }
+            
+            if (toTime > new Date()) {
+                alert('To date cannot be in the future');
+                return;
+            }
+            
+            // Show loading
+            const modalBody = document.getElementById('modalBody');
+            modalBody.innerHTML = '<div class="loading-spinner">Loading custom range data from InfluxDB</div>';
+            
+            try {
+                activeTimeRange = 'custom';
+                const historicalData = await fetchInfluxData(currentDevice, 'custom', fromDate, toDate);
+                displayHistoricalData(historicalData, currentDevice, modalBody);
+            } catch (error) {
+                console.error('Error fetching custom range:', error);
+                modalBody.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: var(--accent-red);">
+                        <h3>❌ Error Loading Data</h3>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Close modal
+        function closeModal() {
+            document.getElementById('historyModal').classList.remove('show');
+        }
+        
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('historyModal');
+            if (event.target === modal) {
+                closeModal();
             }
         }
     </script>
