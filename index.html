@@ -120,6 +120,7 @@
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             position: relative;
             overflow: hidden;
+            cursor: pointer;
         }
 
         .gauge-card::before {
@@ -141,6 +142,16 @@
         }
 
         .gauge-card:hover::before {
+            opacity: 1;
+        }
+
+        .gauge-card.active {
+            border-color: var(--card-color);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3), 0 0 30px var(--card-color);
+            transform: translateY(-5px) scale(1.02);
+        }
+
+        .gauge-card.active::before {
             opacity: 1;
         }
 
@@ -453,7 +464,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>⚡ IoT MONITOR</h1>
+            <h1 style="cursor: pointer;" onclick="clearAllFilters()">⚡ IoT MONITOR</h1>
             <div class="subtitle">Real-time Device Telemetry Dashboard</div>
         </div>
 
@@ -488,6 +499,7 @@
                     <h2>📡 Device Status</h2>
                     <div class="device-count" id="deviceCount">0 Devices</div>
                 </div>
+                
                 <div class="table-wrapper">
                     <table class="device-table">
                         <thead>
@@ -518,6 +530,7 @@
         const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
         const SHEET_ID = '1nC-nLfFwI0zia3ItR5ljpPimfTdXGUSVPXUMEkbjEV4';
         let refreshTimer;
+        let allDevices = []; // Store all devices for filtering
 
         // Create circular gauge
         function createGauge(value, max, color) {
@@ -541,10 +554,10 @@
                 document.getElementById('loading').style.display = 'block';
                 document.getElementById('error').style.display = 'none';
 
-                // Fetch JSON data
-                const apiUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json`;
+                // Fetch JSON data from the Summary sheet
+                const apiUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&gid=941941150`;
                 
-                console.log('Fetching from:', apiUrl);
+                console.log('Fetching from Summary sheet:', apiUrl);
                 
                 const response = await fetch(apiUrl);
                 
@@ -587,30 +600,80 @@
                 for (let i = 0; i < rows.length; i++) {
                     const row = rows[i].c;
                     
+                    // Skip if no SIG column data
+                    if (!row[1] || !row[1].v) continue;
+                    
+                    const sig = row[1].v;
+                    
                     // Collect device rows (rows with SIG data containing REET or TEST)
-                    if (row[1] && row[1].v && typeof row[1].v === 'string' && 
-                        (row[1].v.includes('REET') || row[1].v.includes('TEST'))) {
-                        deviceRows.push({
+                    if (typeof sig === 'string' && (sig.includes('REET') || sig.includes('TEST'))) {
+                        
+                        // Debug first device to see structure
+                        if (deviceRows.length === 0) {
+                            console.log('First device row structure:', {
+                                timestamp: row[0],
+                                sig: row[1],
+                                software: row[2],
+                                voltage: row[3],
+                                current: row[4],
+                                temp: row[5],
+                                soc: row[6],
+                                cycles: row[7],
+                                csq: row[8],
+                                transmitting: row[9],
+                                fwStatus: row[10],
+                                installed: row[11]
+                            });
+                        }
+                        
+                        const device = {
                             timestamp: row[0]?.f || row[0]?.v || '',
                             sig: row[1]?.v || '',
                             software: row[2]?.v || '',
-                            voltage: row[3]?.v || 0,
-                            current: row[4]?.v || 0,
-                            temperature: row[5]?.v || 0,
-                            soc: row[6]?.v || 0,
-                            cycles: row[7]?.v || 0,
-                            csq: row[8]?.v || 0,
-                            transmitting: row[9]?.v === true || row[9]?.v === 'TRUE',
+                            voltage: row[3]?.v !== null && row[3]?.v !== undefined ? parseFloat(row[3].v) : 0,
+                            current: row[4]?.v !== null && row[4]?.v !== undefined ? parseFloat(row[4].v) : 0,
+                            temperature: row[5]?.v !== null && row[5]?.v !== undefined ? parseFloat(row[5].v) : 0,
+                            soc: row[6]?.v !== null && row[6]?.v !== undefined ? parseFloat(row[6].v) : 0,
+                            cycles: row[7]?.v !== null && row[7]?.v !== undefined ? parseInt(row[7].v) : 0,
+                            csq: row[8]?.v !== null && row[8]?.v !== undefined ? parseInt(row[8].v) : 0,
+                            transmitting: row[9]?.v === true || row[9]?.v === 'TRUE' || row[9]?.v === 'true',
                             fwStatus: row[10]?.v || '',
                             installed: row[11]?.v || ''
-                        });
+                        };
+                        
+                        deviceRows.push(device);
+                        
+                        // Log first 3 parsed devices
+                        if (deviceRows.length <= 3) {
+                            console.log(`Parsed device ${deviceRows.length}:`, device);
+                        }
                     }
                 }
 
                 console.log('Found devices:', deviceRows.length);
 
+                // Sort devices by SIG numeric part only (ignore TEST/REET prefix)
+                deviceRows.sort((a, b) => {
+                    // Extract numeric part from SIG (e.g., "REET0003" -> 3, "TEST0001" -> 1)
+                    const getNumericPart = (sig) => {
+                        const match = sig.match(/\d+/);
+                        return match ? parseInt(match[0]) : 0;
+                    };
+                    
+                    const numA = getNumericPart(a.sig);
+                    const numB = getNumericPart(b.sig);
+                    
+                    return numA - numB;
+                });
+
+                console.log('First device after sorting by number:', deviceRows[0]);
+                console.log('Last device after sorting by number:', deviceRows[deviceRows.length - 1]);
+
+                // Store devices globally for filtering
+                allDevices = deviceRows;
+
                 displayGauges(summaryData);
-                displayDeviceTable(deviceRows.slice(-50)); // Show last 50 devices
+                applyFilters(); // Apply filters and display
                 
                 document.getElementById('loading').style.display = 'none';
                 document.getElementById('dashboardContent').style.display = 'block';
@@ -639,48 +702,54 @@
                     value: data.totalInstalled,
                     max: total,
                     percentage: `${((data.totalInstalled / total) * 100).toFixed(1)}%`,
-                    class: 'installed'
+                    class: 'installed',
+                    filterType: 'installed'
                 },
                 {
                     label: 'Transmitting OK',
                     value: data.transmittingSuccessfully,
                     max: data.totalInstalled,
                     percentage: `${((data.transmittingSuccessfully / data.totalInstalled) * 100).toFixed(1)}%`,
-                    class: 'transmitting'
+                    class: 'transmitting',
+                    filterType: 'transmitting-ok'
                 },
                 {
                     label: 'Not Transmitting',
                     value: data.notTransmitting,
                     max: data.totalInstalled,
                     percentage: `${((data.notTransmitting / data.totalInstalled) * 100).toFixed(1)}%`,
-                    class: 'not-transmitting'
+                    class: 'not-transmitting',
+                    filterType: 'not-transmitting'
                 },
                 {
                     label: 'Transmitting Zero\'s',
                     value: data.transmittingZeros,
                     max: data.totalInstalled,
                     percentage: `${((data.transmittingZeros / data.totalInstalled) * 100).toFixed(1)}%`,
-                    class: 'zeros'
+                    class: 'zeros',
+                    filterType: 'transmitting-zeros'
                 },
                 {
                     label: 'Not Installed',
                     value: data.notInstalled,
                     max: total,
                     percentage: `${((data.notInstalled / total) * 100).toFixed(1)}%`,
-                    class: 'not-installed'
+                    class: 'not-installed',
+                    filterType: 'not-installed'
                 },
                 {
                     label: 'Not Updated',
                     value: data.notUpdated,
                     max: data.totalInstalled,
                     percentage: `${((data.notUpdated / data.totalInstalled) * 100).toFixed(1)}%`,
-                    class: 'not-updated'
+                    class: 'not-updated',
+                    filterType: 'not-updated'
                 }
             ];
 
             const grid = document.getElementById('gaugesGrid');
             grid.innerHTML = gauges.map(gauge => `
-                <div class="gauge-card ${gauge.class}">
+                <div class="gauge-card ${gauge.class}" onclick="filterByCard('${gauge.filterType}')" id="card-${gauge.filterType}">
                     <div class="gauge-label">${gauge.label}</div>
                     <div class="gauge-visual">
                         ${createGauge(gauge.value, gauge.max)}
@@ -693,20 +762,33 @@
         // Display device table
         function displayDeviceTable(devices) {
             const tbody = document.getElementById('deviceTableBody');
-            tbody.innerHTML = devices.map(device => `
+            
+            if (devices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="12" style="text-align: center; padding: 40px;">No device data found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = devices.map(device => {
+                // Helper to format numbers
+                const formatValue = (val, decimals, unit) => {
+                    if (val === null || val === undefined) return '-';
+                    return val.toFixed(decimals) + unit;
+                };
+                
+                return `
                 <tr>
-                    <td class="timestamp-cell">${device.timestamp}</td>
-                    <td class="sig-cell">${device.sig}</td>
-                    <td>${device.software}</td>
-                    <td>${device.voltage !== 0 ? device.voltage.toFixed(1) + 'V' : '-'}</td>
-                    <td>${device.current !== 0 ? device.current.toFixed(1) + 'A' : '-'}</td>
-                    <td>${device.temperature !== 0 ? device.temperature + '°C' : '-'}</td>
-                    <td>${device.soc !== 0 ? device.soc + '%' : '-'}</td>
-                    <td>${device.cycles || '-'}</td>
-                    <td>${device.csq || '-'}</td>
+                    <td class="timestamp-cell">${device.timestamp || '-'}</td>
+                    <td class="sig-cell">${device.sig || '-'}</td>
+                    <td>${device.software || '-'}</td>
+                    <td>${device.voltage !== null && device.voltage !== undefined ? formatValue(device.voltage, 1, 'V') : '-'}</td>
+                    <td>${device.current !== null && device.current !== undefined ? formatValue(device.current, 1, 'A') : '-'}</td>
+                    <td>${device.temperature !== null && device.temperature !== undefined ? formatValue(device.temperature, 0, '°C') : '-'}</td>
+                    <td>${device.soc !== null && device.soc !== undefined ? formatValue(device.soc, 1, '%') : '-'}</td>
+                    <td>${device.cycles !== null && device.cycles !== undefined && device.cycles !== 0 ? device.cycles : '-'}</td>
+                    <td>${device.csq !== null && device.csq !== undefined && device.csq !== 0 ? device.csq : '-'}</td>
                     <td>
-                        <span class="status-badge ${device.transmitting === true ? 'transmitting' : 'false'}">
-                            ${device.transmitting === true ? '✓ YES' : '✗ NO'}
+                        <span class="status-badge ${device.transmitting ? 'transmitting' : 'false'}">
+                            ${device.transmitting ? '✓ TRUE' : '✗ FALSE'}
                         </span>
                     </td>
                     <td>
@@ -718,7 +800,8 @@
                         ${device.installed || '-'}
                     </td>
                 </tr>
-            `).join('');
+            `;
+            }).join('');
         }
 
         // Auto-refresh
@@ -732,6 +815,109 @@
             loadData();
             startAutoRefresh();
         });
+        
+        let activeFilter = null;
+        
+        // Clear all filters and reload
+        function clearAllFilters() {
+            activeFilter = null;
+            clearActiveCards();
+            applyFilters();
+        }
+        
+        // Filter by card click
+        function filterByCard(filterType) {
+            // Toggle filter - if clicking the same card, clear filter
+            if (activeFilter === filterType) {
+                activeFilter = null;
+                clearActiveCards();
+                applyFilters();
+                return;
+            }
+            
+            activeFilter = filterType;
+            
+            // Update visual state of cards
+            clearActiveCards();
+            const card = document.getElementById(`card-${filterType}`);
+            if (card) {
+                card.classList.add('active');
+            }
+            
+            applyFilters();
+        }
+        
+        // Clear active state from all cards
+        function clearActiveCards() {
+            document.querySelectorAll('.gauge-card').forEach(card => {
+                card.classList.remove('active');
+            });
+        }
+        
+        // Apply filters to device list
+        function applyFilters() {
+            let filteredDevices = [...allDevices];
+            
+            if (activeFilter) {
+                switch(activeFilter) {
+                    case 'installed':
+                        // Show only installed devices
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.installed === 'Installed'
+                        );
+                        break;
+                        
+                    case 'transmitting-ok':
+                        // Show devices transmitting successfully (TRUE and not zeros)
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.transmitting === true && 
+                            !(device.voltage === 0 && device.current === 0 && device.soc === 0)
+                        );
+                        break;
+                        
+                    case 'not-transmitting':
+                        // Show devices not transmitting (FALSE) but only if installed
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.transmitting === false && 
+                            device.installed === 'Installed'
+                        );
+                        break;
+                        
+                    case 'transmitting-zeros':
+                        // Show devices transmitting but all zeros
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.transmitting === true && 
+                            device.voltage === 0 && device.current === 0 && device.soc === 0
+                        );
+                        break;
+                        
+                    case 'not-installed':
+                        // Show devices not installed (Removed status)
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.installed !== 'Installed'
+                        );
+                        break;
+                        
+                    case 'not-updated':
+                        // Show devices with Update FW status
+                        filteredDevices = filteredDevices.filter(device => 
+                            device.fwStatus === 'Update'
+                        );
+                        break;
+                }
+            }
+            
+            displayDeviceTable(filteredDevices);
+            
+            // Update device count
+            if (activeFilter) {
+                document.getElementById('deviceCount').textContent = 
+                    `${filteredDevices.length} of ${allDevices.length} Devices`;
+            } else {
+                document.getElementById('deviceCount').textContent = 
+                    `${allDevices.length} Devices`;
+            }
+        }
     </script>
 </body>
 </html>
