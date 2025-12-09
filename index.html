@@ -26,6 +26,150 @@
             --glow: 0 0 20px rgba(0, 217, 255, 0.3);
         }
 
+        /* Authentication Screen */
+        .auth-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+        }
+
+        .auth-screen.hidden {
+            display: none;
+        }
+
+        .auth-box {
+            background: var(--bg-card);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 20px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            animation: slideUp 0.6s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(50px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .auth-box h1 {
+            color: var(--accent-cyan);
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-family: 'Space Mono', monospace;
+        }
+
+        .auth-box p {
+            color: var(--text-secondary);
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 15px;
+            background: var(--bg-dark);
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1.1em;
+            font-family: 'Space Mono', monospace;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+        }
+
+        .auth-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1em;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .auth-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(0, 217, 255, 0.4);
+        }
+
+        .auth-error {
+            background: rgba(255, 46, 99, 0.2);
+            border: 1px solid var(--accent-red);
+            color: var(--accent-red);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .auth-error.show {
+            display: block;
+            animation: shake 0.5s;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .dashboard-container {
+            display: none;
+        }
+
+        .dashboard-container.authenticated {
+            display: block;
+        }
+
+        .logout-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 46, 99, 0.2);
+            border: 2px solid var(--accent-red);
+            color: var(--accent-red);
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Space Mono', monospace;
+            font-weight: 600;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .logout-btn:hover {
+            background: var(--accent-red);
+            color: white;
+        }
+
         body {
             font-family: 'Outfit', sans-serif;
             background: var(--bg-dark);
@@ -651,6 +795,36 @@
     </style>
 </head>
 <body>
+    <!-- Authentication Screen -->
+    <div id="authScreen" class="auth-screen">
+        <div class="auth-box">
+            <h1>🔒</h1>
+            <h1>IoT Monitor</h1>
+            <p>Enter password to access dashboard</p>
+            
+            <div id="authError" class="auth-error">
+                ❌ Incorrect password. Please try again.
+            </div>
+            
+            <input type="password" 
+                   id="passwordInput" 
+                   class="auth-input" 
+                   placeholder="Enter password"
+                   onkeypress="if(event.key==='Enter') checkPassword()">
+            
+            <button class="auth-button" onclick="checkPassword()">
+                🔓 Unlock Dashboard
+            </button>
+        </div>
+    </div>
+
+    <!-- Logout Button -->
+    <button id="logoutBtn" class="logout-btn" onclick="logout()" style="display: none;">
+        🔒 Logout
+    </button>
+
+    <!-- Main Dashboard (hidden until authenticated) -->
+    <div id="dashboardContainer" class="dashboard-container">
     <div class="container">
         <div class="header">
             <h1 style="cursor: pointer;" onclick="clearAllFilters()">⚡ IoT MONITOR</h1>
@@ -714,6 +888,7 @@
             </div>
         </div>
     </div>
+    </div> <!-- Close dashboard-container -->
 
     <!-- Historical Data Modal -->
     <div id="historyModal" class="modal">
@@ -730,6 +905,83 @@
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
     <script>
+        // =====================================================
+        // AUTHENTICATION SYSTEM
+        // =====================================================
+        
+        // PASSWORD CONFIGURATION - CHANGE THIS!
+        const DASHBOARD_PASSWORD = 'iot2024'; // Change this to your desired password
+        
+        // Check if already authenticated (session storage)
+        function checkAuth() {
+            const isAuthenticated = sessionStorage.getItem('iot_dashboard_auth') === 'true';
+            
+            if (isAuthenticated) {
+                showDashboard();
+            } else {
+                showAuthScreen();
+            }
+        }
+        
+        // Verify password
+        function checkPassword() {
+            const input = document.getElementById('passwordInput');
+            const password = input.value;
+            const errorDiv = document.getElementById('authError');
+            
+            if (password === DASHBOARD_PASSWORD) {
+                // Correct password
+                sessionStorage.setItem('iot_dashboard_auth', 'true');
+                showDashboard();
+                input.value = '';
+                errorDiv.classList.remove('show');
+            } else {
+                // Wrong password
+                errorDiv.classList.add('show');
+                input.value = '';
+                input.focus();
+                
+                // Shake animation and hide error after 3 seconds
+                setTimeout(() => {
+                    errorDiv.classList.remove('show');
+                }, 3000);
+            }
+        }
+        
+        // Show dashboard (hide auth screen)
+        function showDashboard() {
+            document.getElementById('authScreen').classList.add('hidden');
+            document.getElementById('dashboardContainer').classList.add('authenticated');
+            document.getElementById('logoutBtn').style.display = 'block';
+            
+            // Load dashboard data
+            loadData();
+            startAutoRefresh();
+        }
+        
+        // Show auth screen (hide dashboard)
+        function showAuthScreen() {
+            document.getElementById('authScreen').classList.remove('hidden');
+            document.getElementById('dashboardContainer').classList.remove('authenticated');
+            document.getElementById('logoutBtn').style.display = 'none';
+            document.getElementById('passwordInput').focus();
+        }
+        
+        // Logout function
+        function logout() {
+            sessionStorage.removeItem('iot_dashboard_auth');
+            showAuthScreen();
+            
+            // Stop auto-refresh
+            if (refreshTimer) {
+                clearInterval(refreshTimer);
+            }
+        }
+        
+        // =====================================================
+        // DASHBOARD CODE
+        // =====================================================
+        
         const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes
         const SHEET_ID = '1nC-nLfFwI0zia3ItR5ljpPimfTdXGUSVPXUMEkbjEV4';
         let refreshTimer;
@@ -1018,8 +1270,8 @@
 
         // Initialize
         window.addEventListener('load', () => {
-            loadData();
-            startAutoRefresh();
+            // Check authentication first
+            checkAuth();
         });
         
         let activeFilter = null;
@@ -1132,7 +1384,7 @@
         // =====================================================
         
         // Apps Script proxy URL - UPDATE THIS WITH YOUR DEPLOYMENT URL
-        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbyoO9NLaXuW90cSlOcoUn_aqXQh40x3URSl-cXSGYEXeELGiRHQCeerVaUS5B92z1qdTQ/exec';
+        const PROXY_URL = 'YOUR_APPS_SCRIPT_WEB_APP_URL_HERE';
         // Example: 'https://script.google.com/macros/s/AKfycbx.../exec'
         
         // Fetch historical data via secure proxy
@@ -1245,21 +1497,40 @@
             modalBody.innerHTML = '<div class="loading-spinner">Loading historical data from InfluxDB</div>';
             
             try {
+                console.log('Attempting to fetch data for:', deviceSig, 'with range:', activeTimeRange);
+                
                 // Fetch data from InfluxDB with current time range
                 const historicalData = await fetchInfluxData(deviceSig, activeTimeRange);
+                
+                console.log('Data received:', historicalData);
                 
                 // Display the data
                 displayHistoricalData(historicalData, deviceSig, modalBody);
                 
             } catch (error) {
-                console.error('Error fetching historical data:', error);
+                console.error('Full error object:', error);
+                console.error('Error message:', error.message);
+                console.error('Error stack:', error.stack);
+                
                 modalBody.innerHTML = `
                     <div style="text-align: center; padding: 40px; color: var(--accent-red);">
                         <h3>❌ Error Loading Data</h3>
-                        <p>${error.message}</p>
+                        <p><strong>Error:</strong> ${error.message}</p>
                         <p style="margin-top: 20px; color: var(--text-secondary); font-size: 0.9em;">
-                            Check browser console for details
+                            Check browser console (F12) for detailed logs
                         </p>
+                        <div style="margin-top: 20px; padding: 15px; background: rgba(0,0,0,0.3); border-radius: 8px; text-align: left; font-family: monospace; font-size: 0.8em;">
+                            <strong>Debugging info:</strong><br>
+                            Device: ${deviceSig}<br>
+                            Range: ${activeTimeRange}<br>
+                            Proxy URL: ${PROXY_URL}<br>
+                            <br>
+                            <strong>Troubleshooting:</strong><br>
+                            1. Check if proxy URL is correct<br>
+                            2. Verify Apps Script deployment is public<br>
+                            3. Test proxy URL directly in browser<br>
+                            4. Check Apps Script logs for errors
+                        </div>
                     </div>
                 `;
             }
