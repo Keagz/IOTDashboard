@@ -1128,95 +1128,49 @@
         }
         
         // =====================================================
-        // INFLUXDB INTEGRATION
+        // SECURE INFLUXDB INTEGRATION - Via Apps Script Proxy
         // =====================================================
         
-        // InfluxDB Configuration
-        const INFLUXDB_CONFIG = {
-            url: 'https://us-east-1-1.aws.cloud2.influxdata.com',
-            token: 'gX1VVAVav-qDY7kY-61jlCz5vJRKDFqTUM85KW9Ud1pGh7h90jTwTXScp8DTctdAWRIzF5UeQ47CXLVsGU4ABw==',
-            org: '197676ca308df45e',
-            bucket: 'iot_data',
-            measurement: 'battery_data'
-        };
+        // Apps Script proxy URL - UPDATE THIS WITH YOUR DEPLOYMENT URL
+        const PROXY_URL = 'https://script.google.com/macros/s/AKfycbyoO9NLaXuW90cSlOcoUn_aqXQh40x3URSl-cXSGYEXeELGiRHQCeerVaUS5B92z1qdTQ/exec';
+        // Example: 'https://script.google.com/macros/s/AKfycbx.../exec'
         
-        // Fetch historical data from InfluxDB
+        // Fetch historical data via secure proxy
         async function fetchInfluxData(deviceSig, timeRange = '1d', customFrom = null, customTo = null) {
-            let query;
-            
-            if (timeRange === 'custom' && customFrom && customTo) {
-                // Custom date range
-                const fromTime = new Date(customFrom).toISOString();
-                const toTime = new Date(customTo).toISOString();
+            try {
+                // Build query URL
+                let url = `${PROXY_URL}?action=queryHistory&sig=${encodeURIComponent(deviceSig)}&range=${timeRange}`;
                 
-                // Calculate appropriate aggregation window based on time span
-                const spanMs = new Date(customTo) - new Date(customFrom);
-                const spanHours = spanMs / (1000 * 60 * 60);
-                
-                let aggregateWindow;
-                if (spanHours <= 3) {
-                    aggregateWindow = '1m';
-                } else if (spanHours <= 24) {
-                    aggregateWindow = '5m';
-                } else if (spanHours <= 168) {
-                    aggregateWindow = '15m';
-                } else {
-                    aggregateWindow = '1h';
+                if (timeRange === 'custom' && customFrom && customTo) {
+                    url += `&from=${encodeURIComponent(customFrom)}&to=${encodeURIComponent(customTo)}`;
                 }
                 
-                query = `
-                    from(bucket: "${INFLUXDB_CONFIG.bucket}")
-                    |> range(start: ${fromTime}, stop: ${toTime})
-                    |> filter(fn: (r) => r["_measurement"] == "${INFLUXDB_CONFIG.measurement}")
-                    |> filter(fn: (r) => r["sig"] == "${deviceSig}")
-                    |> filter(fn: (r) => r["_field"] == "voltage" or r["_field"] == "current" or r["_field"] == "soc" or r["_field"] == "temperature")
-                    |> aggregateWindow(every: ${aggregateWindow}, fn: mean, createEmpty: false)
-                    |> yield(name: "mean")
-                `;
-            } else {
-                // Preset time ranges
-                const timeConfig = {
-                    '1h': { hours: 1, window: '1m' },   // 1 hour: 1-minute intervals
-                    '6h': { hours: 6, window: '5m' },   // 6 hours: 5-minute intervals
-                    '1d': { hours: 24, window: '15m' }, // 1 day: 15-minute intervals
-                    '1w': { hours: 168, window: '1h' }  // 1 week: 1-hour intervals
-                };
+                console.log('Fetching from proxy:', url);
                 
-                const config = timeConfig[timeRange] || timeConfig['1d'];
-                
-                query = `
-                    from(bucket: "${INFLUXDB_CONFIG.bucket}")
-                    |> range(start: -${config.hours}h)
-                    |> filter(fn: (r) => r["_measurement"] == "${INFLUXDB_CONFIG.measurement}")
-                    |> filter(fn: (r) => r["sig"] == "${deviceSig}")
-                    |> filter(fn: (r) => r["_field"] == "voltage" or r["_field"] == "current" or r["_field"] == "soc" or r["_field"] == "temperature")
-                    |> aggregateWindow(every: ${config.window}, fn: mean, createEmpty: false)
-                    |> yield(name: "mean")
-                `;
-            }
-            
-            const url = `${INFLUXDB_CONFIG.url}/api/v2/query?org=${INFLUXDB_CONFIG.org}`;
-            
-            try {
-                const response = await fetch(url, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Token ${INFLUXDB_CONFIG.token}`,
-                        'Content-Type': 'application/vnd.flux',
-                        'Accept': 'application/csv'
-                    },
-                    body: query
-                });
+                const response = await fetch(url);
                 
                 if (!response.ok) {
-                    throw new Error(`InfluxDB query failed: ${response.status} ${response.statusText}`);
+                    throw new Error(`Proxy request failed: ${response.status} ${response.statusText}`);
+                }
+                
+                const contentType = response.headers.get('content-type');
+                
+                // Check if response is JSON (error) or CSV (success)
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Unknown error from proxy');
                 }
                 
                 const csvData = await response.text();
+                
+                if (!csvData || csvData.trim().length === 0) {
+                    throw new Error('No data returned from proxy');
+                }
+                
                 return parseInfluxCSV(csvData);
                 
             } catch (error) {
-                console.error('InfluxDB fetch error:', error);
+                console.error('Proxy fetch error:', error);
                 throw error;
             }
         }
